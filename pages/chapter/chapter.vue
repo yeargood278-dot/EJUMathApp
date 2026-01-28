@@ -30,7 +30,7 @@
 					<view class="jp-box">
 						<view class="math-text" v-html="rawHtml(item.jp)"></view>
 						<view class="btn-group">
-							<view class="btn-mini btn-read" @click="module.speak(item.jp)">🔊</view>
+							<view class="btn-mini btn-read" @click.stop="module.speak(item.jp)">🔊</view>
 							<view class="btn-mini btn-trans" @click="toggleTrans(idx, 'point')">译</view>
 						</view>
 					</view>
@@ -45,7 +45,7 @@
 				<view v-for="(item, idx) in currentData.concepts" :key="idx" class="item-row">
 					<view class="jp-box">
 						<text style="color:#e84393; font-weight:bold; margin-right:10px;">{{ item.term_jp }}</text>
-						<view class="btn-mini btn-read" @click="module.speak(item.desc_jp)">🔊</view>
+						<view class="btn-mini btn-read" @click.stop="module.speak(item.desc_jp)">🔊</view>
 					</view>
 					<view v-if="item.svg" class="svg-container" v-html="rawHtml(item.svg)"></view>
 					<view class="math-text" style="margin-top:5px;" v-html="rawHtml(item.desc_jp)"></view>
@@ -65,7 +65,7 @@
 					<view class="jp-box" style="margin-top:5px;">
 						<text style="font-size:24rpx; color:#666;">Note:</text>
 						<view class="math-text note-text" v-html="rawHtml(item.note_jp)"></view>
-						<view class="btn-mini btn-read" @click="module.speak(item.note_jp)">🔊</view>
+						<view class="btn-mini btn-read" @click.stop="module.speak(item.note_jp)">🔊</view>
 						<view class="btn-mini btn-trans" @click="toggleTrans(idx, 'formula')">译</view>
 					</view>
 					<view class="cn-text" v-if="showStates.formula[idx]">
@@ -98,7 +98,6 @@
 </template>
 
 <script>
-	// 使用相对路径避免编译错误
 	import { chapterDetails, chapters } from '../../common/courseData.js';
 
 	export default {
@@ -143,7 +142,6 @@
 </script>
 
 <script module="module" lang="renderjs">
-	// renderjs 中同样使用相对路径引用数据
 	import { chapterDetails } from '../../common/courseData.js';
 
 	export default {
@@ -158,7 +156,6 @@
 		},
 		methods: {
 			initMathJax() {
-				// 配置 MathJax 参数
 				window.MathJax = {
 					tex: {
 						inlineMath: [['$', '$'], ['\\(', '\\)']],
@@ -166,14 +163,13 @@
 						processEscapes: true
 					},
 					options: {
-						enableMenu: false // 禁用移动端右键菜单
+						enableMenu: false 
 					},
 					startup: {
 						typeset: false
 					}
 				};
 
-				// 加载本地脚本以解决真机公式显示问题
 				const script = document.createElement('script');
 				script.src = "../../static/js/tex-mml-chtml.js";
 				script.async = true;
@@ -182,7 +178,6 @@
 					if(this.cachedData) this.refreshAll();
 				};
 				script.onerror = () => {
-					// 备用方案：如果本地脚本加载失败则尝试 CDN
 					const cdnScript = document.createElement('script');
 					cdnScript.src = "https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js";
 					cdnScript.onload = () => {
@@ -204,7 +199,6 @@
 			refreshAll() {
 				if (!this.isMathJaxReady) return;
 				this.randomExample();
-				// 延迟确保 Vue DOM 更新后执行公式排版
 				setTimeout(() => {
 					this.runTypeset();
 				}, 500);
@@ -260,36 +254,57 @@
 				}
 			},
 
-			// 修改语音合成方法，适配原生安卓环境
 			speak(text) {
-				if(!text) return;
-				// 去除 LaTeX 代码，只朗读核心文本
-				let clean = text.replace(/\$.*?\$/g, "数式");
-				
-				// #ifdef APP-PLUS
-				// 使用 uni-app 原生语音合成 API 解决真机无声问题
-				plus.speech.stop();
-				plus.speech.startSynthesize(clean, {
-					lang: 'ja-JP',
-					rate: 0.9
-				}, () => {
-					console.log('播放成功');
-				}, (err) => {
-					console.error('播放失败:', err);
-				});
-				// #endif
-
-				// #ifndef APP-PLUS
-				// 非 App 环境使用 Web API
-				window.speechSynthesis.cancel();
-				let u = new SpeechSynthesisUtterance(clean);
-				u.lang = 'ja-JP'; 
-				u.rate = 0.9;
-				window.speechSynthesis.speak(u);
-				// #endif
-			}
+			    // 核心修复：增加严谨的类型判断
+			    // 如果 text 是对象（[object Object]）或者是 undefined/null，直接拦截
+			    if (typeof text !== 'string' || !text || text === '[object Object]') {
+			        console.warn('语音合成拦截：输入参数无效或为非字符串对象', text);
+			        return;
+			    }
+			
+			    // 过滤掉数学公式符号，防止朗读“dollar”
+			    let clean = text.replace(/\$.*?\$/g, "数式");
+			
+			    // #ifdef APP-PLUS
+			    try {
+			        plus.speech.stop();
+			        plus.speech.startSynthesize(clean, {
+			            lang: 'ja-JP',
+			            rate: 0.9
+			        }, () => {
+			            console.log('原生语音播放成功');
+			        }, (err) => {
+			            console.error('原生接口报错，尝试在线方案', err);
+			            this.fallbackOnlineTTS(clean); 
+			        });
+			    } catch (e) {
+			        this.fallbackOnlineTTS(clean);
+			    }
+			    // #endif
+			
+			    // #ifndef APP-PLUS
+			    this.fallbackOnlineTTS(clean);
+			    // #endif
+			},
+			
+			fallbackOnlineTTS(text) {
+			    if (!text) return;
+			    // 使用百度在线接口作为备选
+			    const url = `https://tts.baidu.com/text2audio?lan=jp&ie=UTF-8&text=${encodeURIComponent(text)}`;
+			    const audio = new Audio();
+			    audio.src = url;
+			    audio.play().catch(e => {
+			        console.error("在线方案失败，尝试 Web Speech API", e);
+			        if (window.speechSynthesis) {
+			            window.speechSynthesis.cancel();
+			            let u = new SpeechSynthesisUtterance(text);
+			            u.lang = 'ja-JP';
+			            window.speechSynthesis.speak(u);
+			        }
+			    });
 		}
-	}
+	},
+}
 </script>
 
 <style>
@@ -342,7 +357,6 @@
 	.math-block { margin: 15rpx 0; background: #fafafa; padding: 10px; border-radius: 8px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
 	.dynamic-zone { padding: 25rpx; border-radius: 10rpx; background: #fff8f8; border: 1px dashed #fab1a0; min-height: 100rpx; }
 
-	/* 优化图像尺寸，防止在安卓端显示过大 */
 	.svg-container { 
 		width: 100%; display: flex; justify-content: center; margin: 20rpx 0; 
 		padding: 20rpx; background: #f9f9f9; border-radius: 12rpx;
@@ -352,3 +366,4 @@
 		filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
 	}
 </style>
+
