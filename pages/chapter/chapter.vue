@@ -153,7 +153,7 @@
 
 <script module="module" lang="renderjs">
 	// pages/chapter/chapter.vue 内部的 renderjs 模块
-	import { chapterDetails } from '@/common/courseData.js';
+	import { chapterDetails } from '../../common/courseData.js';
 	
 	export default {
 	    data() {
