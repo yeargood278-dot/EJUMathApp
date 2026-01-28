@@ -44,16 +44,12 @@
                 "abiFilters" : [ "arm64-v8a", "x86" ]
             },
             /* ios打包配置 */
-            "ios" : {},
+            "ios" : {
+                "dSYMs" : false
+            },
             /* SDK配置 */
             "sdkConfigs" : {
-                "speech" : {
-                    "baidu" : {
-                        "appid" : "120524788",
-                        "apikey" : "t7ntfrvTVkl4gxshQwwOhFwN",
-                        "secretkey" : "c0h2QItb4SviPOhRXUMbJxKis9blU4v6"
-                    }
-                }
+                "speech" : {}
             },
             "icons" : {
                 "android" : {
