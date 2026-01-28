@@ -152,100 +152,94 @@
 </script>
 
 <script module="module" lang="renderjs">
+	// pages/chapter/chapter.vue 内部的 renderjs 模块
 	import { chapterDetails } from '@/common/courseData.js';
-
+	
 	export default {
-		data() {
-			return {
-				isMathJaxReady: false,
-				cachedData: null
-			}
-		},
-		mounted() {
-			// 动态加载 MathJax
-			if (typeof window.MathJax === 'undefined') {
-				const script = document.createElement('script');
-				script.src = "https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js";
-				script.async = true;
-				script.onload = () => {
-					this.initMathJax();
-				};
-				document.head.appendChild(script);
-			} else {
-				this.initMathJax();
-			}
-		},
-		methods: {
-			initMathJax() {
-				window.MathJax = {
-					tex: {
-						inlineMath: [['$', '$'], ['\\(', '\\)']],
-						displayMath: [['$$', '$$'], ['\\[', '\\]']],
-						processEscapes: true
-					},
-					svg: { fontCache: 'global' },
-					startup: {
-						typeset: false // 禁止自动初始化，改为手动控制
-					}
-				};
-				this.isMathJaxReady = true;
-				// 如果有缓存的数据，立即渲染
-				if(this.cachedData) {
-					this.refreshAll();
-				}
-			},
-
-			// 监听逻辑层数据变化
-			renderMath(newValue, oldValue, ownerInstance, instance) {
-				if (newValue) {
-					this.cachedData = newValue;
-					// 延迟 300ms 确保 Vue 已经把 HTML 渲染到 DOM 中
-					if (this.isMathJaxReady) {
-						setTimeout(() => {
-							this.refreshAll();
-						}, 300);
-					}
-				}
-			},
-
-			refreshAll() {
-				// 1. 自动生成一个初始例题
-				this.randomExample(null, null);
-				// 2. 渲染全页面公式
-				this.runTypeset();
-			},
-
-			runTypeset() {
-				if (window.MathJax && window.MathJax.typesetPromise) {
-					window.MathJax.typesetPromise().catch((err) => console.log('MathJax Error:', err));
-				}
-			},
-
-			// 生成随机例题
-			randomExample(event, ownerInstance) {
-				let data = this.cachedData;
-				// 兜底数据
-				if (!data) data = chapterDetails[1];
-
-				if(data && data.pool_examples && data.pool_examples.length > 0) {
-					const list = data.pool_examples;
-					const item = list[Math.floor(Math.random() * list.length)];
-					
-					const el = document.getElementById('math-area-example');
-					if(el) {
-						el.innerHTML = `
-							<div style="font-weight:bold; margin-bottom:8px; font-size:16px;">${item.q_jp}</div>
-							<div style="color:#666; font-size:14px; margin-bottom:12px;">${item.q_cn}</div>
-							<div style="background:#f9f9f9; padding:10px; border-radius:5px; border-left:3px solid #ccc;">
-								<div style="color:#e84393; font-weight:bold; font-size:14px;">考え方：</div>
-								<div style="font-size:14px; margin: 4px 0;">${item.think_jp}</div>
-								<div style="font-size:12px; color:#888;">${item.think_cn}</div>
-							</div>
-							<div style="margin-top:12px; font-weight:bold; font-size:16px; color:#333;">解： <span style="color:#0984e3">${item.sol}</span></div>
-						`;
-						this.runTypeset();
-					}
-				}
+	    data() {
+	        return {
+	            isMathJaxReady: false,
+	            cachedData: null
+	        }
+	    },
+	    mounted() {
+	        // 1. 配置 MathJax 选项
+	        window.MathJax = {
+	            tex: {
+	                inlineMath: [['$', '$'], ['\\(', '\\)']],
+	                displayMath: [['$$', '$$'], ['\\[', '\\]']],
+	                processEscapes: true
+	            },
+	            options: {
+	                enableMenu: false // 禁用右键菜单以适应移动端
+	            },
+	            startup: {
+	                typeset: false // 禁用自动初始化
+	            }
+	        };
+	
+	        // 2. 动态加载 MathJax 脚本
+	        if (typeof window.MathJax === 'undefined' || !window.MathJax.typesetPromise) {
+	            const script = document.createElement('script');
+	            script.src = "https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js";
+	            script.async = true;
+	            script.onload = () => {
+	                this.isMathJaxReady = true;
+	                if(this.cachedData) this.refreshAll();
+	            };
+	            document.head.appendChild(script);
+	        } else {
+	            this.isMathJaxReady = true;
+	        }
+	    },
+	    methods: {
+	        // 监听逻辑层数据变化
+	        renderMath(newValue) {
+	            if (newValue) {
+	                this.cachedData = newValue;
+	                this.refreshAll();
+	            }
+	        },
+	
+	        refreshAll() {
+	            if (!this.isMathJaxReady) return;
+	            
+	            // 默认生成第一个例题
+	            this.randomExample();
+	            
+	            // 核心：使用 nextTick 或 setTimeout 确保 DOM 已更新后再渲染公式
+	            setTimeout(() => {
+	                if (window.MathJax && window.MathJax.typesetPromise) {
+	                    window.MathJax.typesetPromise().then(() => {
+	                        console.log('MathJax渲染完成');
+	                    }).catch((err) => console.error('MathJax渲染错误:', err));
+	                }
+	            }, 500); // 增加延迟以确保 Vue 完成 DOM 插入
+	        },
+	
+	        runTypeset() {
+	            // 局部动态生成内容后的手动渲染
+	            this.$nextTick(() => {
+	                if (window.MathJax && window.MathJax.typesetPromise) {
+	                    window.MathJax.typesetPromise();
+	                }
+	            });
+	        },
+	
+	        randomExample() {
+	            let data = this.cachedData || chapterDetails[1];
+	            if(data && data.pool_examples) {
+	                const item = data.pool_examples[Math.floor(Math.random() * data.pool_examples.length)];
+	                const el = document.getElementById('math-area-example');
+	                if(el) {
+	                    el.innerHTML = `
+	                        <div class="math-q">${item.q_jp}</div>
+	                        <div class="math-cn">${item.q_cn}</div>
+	                        <div class="math-sol">解： ${item.sol}</div>
+	                    `;
+	                    this.runTypeset(); // 重新渲染新生成的公式
+	                }
+	            }
 			},
 
 			// 生成随机测试
@@ -353,7 +347,7 @@
 	.item-row:last-child { border-bottom: none; margin-bottom: 0; }
 	
 	.jp-box { display: flex; flex-wrap: wrap; align-items: center; margin-bottom: 10rpx; }
-	.math-text { font-size: 30rpx; color: #333; margin-right: 10px; display: inline-block; }
+	.math-text { font-size: 30rpx; color: #333; line-height: 1.6; word-wrap: break-word; }
 	.note-text { font-size: 26rpx; color: #666; margin-left: 5px; display: inline-block; }
 
 	.btn-group { display: inline-flex; align-items: center; }
@@ -367,7 +361,9 @@
 	.btn-generate { font-size: 24rpx; background: #9b59b6; color: white; padding: 10rpx 25rpx; border-radius: 30rpx; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
 	.btn-generate:active { transform: scale(0.95); opacity: 0.9; }
 
-	.math-block { margin: 15rpx 0; background: #fafafa; padding: 10px; border-radius: 8px; overflow-x: auto; }
-	.dynamic-zone { padding: 25rpx; border-radius: 10rpx; background: #fff8f8; border: 1px dashed #fab1a0; min-height: 100rpx; }
-	.svg-container { width: 100%; display: flex; justify-content: center; margin: 15px 0; }
-</style>
+	.math-block { margin: 20rpx 0; padding: 20rpx; background: #fdfdfd; border-radius: 12rpx; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .dynamic-zone:empty { display: none; }
+	.svg-container { width: 100%; display: flex; justify-content: center; margin: 20rpx 0; padding: 20rpx; background-color: #f9f9f9; border-radius: 12rpx; }
+	.svg-container :deep(svg) { width: 60% !important; height: auto !important; max-width: 400rpx; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1)); }
+	@media (min-width: 768px) { .svg-container :deep(svg) { max-width: 500rpx; } }
+	</style>
