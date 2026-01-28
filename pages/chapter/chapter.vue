@@ -47,11 +47,8 @@
 						<text style="color:#e84393; font-weight:bold; margin-right:10px;">{{ item.term_jp }}</text>
 						<view class="btn-mini btn-read" @click="module.speak(item.desc_jp)">🔊</view>
 					</view>
-					
 					<view v-if="item.svg" class="svg-container" v-html="rawHtml(item.svg)"></view>
-					
 					<view class="math-text" style="margin-top:5px;" v-html="rawHtml(item.desc_jp)"></view>
-					
 					<view class="btn-trans-text" @click="toggleTrans(idx, 'concept')">查看中文释义</view>
 					<view class="cn-text" v-if="showStates.concept[idx]">
 						<view class="math-text" v-html="rawHtml(item.desc_cn)"></view>
@@ -63,11 +60,8 @@
 				<view class="card-title">公式と定理 (Formulas)</view>
 				<view v-for="(item, idx) in currentData.formulas" :key="idx" class="item-row">
 					<view style="font-weight:bold; color:#6c5ce7; margin-bottom:5px;">{{ item.name_jp }}</view>
-					
 					<view v-if="item.svg" class="svg-container" v-html="rawHtml(item.svg)"></view>
-
 					<view class="math-block" v-html="rawHtml(item.content_jp)"></view>
-					
 					<view class="jp-box" style="margin-top:5px;">
 						<text style="font-size:24rpx; color:#666;">Note:</text>
 						<view class="math-text note-text" v-html="rawHtml(item.note_jp)"></view>
@@ -104,7 +98,8 @@
 </template>
 
 <script>
-	import { chapterDetails, chapters } from '@/common/courseData.js';
+	// 使用相对路径避免编译错误
+	import { chapterDetails, chapters } from '../../common/courseData.js';
 
 	export default {
 		data() {
@@ -123,7 +118,6 @@
 				uni.reLaunch({ url: '/pages/index/index' });
 			},
 			switchChapter(id) {
-				// 使用 redirectTo 切换章节，避免页面栈堆积
 				uni.redirectTo({
 					url: `/pages/chapter/chapter?id=${id}`
 				});
@@ -131,13 +125,10 @@
 			loadChapter(id) {
 				this.cid = id;
 				const data = chapterDetails[id];
-				// 查找对应章节的颜色
 				const meta = chapters.find(c => c.id === id);
-				
 				if(data) {
 					this.currentData = data;
 					if (meta) this.themeColor = meta.color;
-					// 重置翻译状态
 					this.showStates = { point: {}, concept: {}, formula: {} };
 				}
 			},
@@ -152,107 +143,108 @@
 </script>
 
 <script module="module" lang="renderjs">
-	// pages/chapter/chapter.vue 内部的 renderjs 模块
+	// renderjs 中同样使用相对路径引用数据
 	import { chapterDetails } from '../../common/courseData.js';
-	
+
 	export default {
-	    data() {
-	        return {
-	            isMathJaxReady: false,
-	            cachedData: null
-	        }
-	    },
-	    mounted() {
-	        // 1. 配置 MathJax 选项
-	        window.MathJax = {
-	            tex: {
-	                inlineMath: [['$', '$'], ['\\(', '\\)']],
-	                displayMath: [['$$', '$$'], ['\\[', '\\]']],
-	                processEscapes: true
-	            },
-	            options: {
-	                enableMenu: false // 禁用右键菜单以适应移动端
-	            },
-	            startup: {
-	                typeset: false // 禁用自动初始化
-	            }
-	        };
-	
-	        // 2. 动态加载 MathJax 脚本
-	        if (typeof window.MathJax === 'undefined' || !window.MathJax.typesetPromise) {
-	            const script = document.createElement('script');
-	            script.src = "https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js";
-	            script.async = true;
-	            script.onload = () => {
-	                this.isMathJaxReady = true;
-	                if(this.cachedData) this.refreshAll();
-	            };
-	            document.head.appendChild(script);
-	        } else {
-	            this.isMathJaxReady = true;
-	        }
-	    },
-	    methods: {
-	        // 监听逻辑层数据变化
-	        renderMath(newValue) {
-	            if (newValue) {
-	                this.cachedData = newValue;
-	                this.refreshAll();
-	            }
-	        },
-	
-	        refreshAll() {
-	            if (!this.isMathJaxReady) return;
-	            
-	            // 默认生成第一个例题
-	            this.randomExample();
-	            
-	            // 核心：使用 nextTick 或 setTimeout 确保 DOM 已更新后再渲染公式
-	            setTimeout(() => {
-	                if (window.MathJax && window.MathJax.typesetPromise) {
-	                    window.MathJax.typesetPromise().then(() => {
-	                        console.log('MathJax渲染完成');
-	                    }).catch((err) => console.error('MathJax渲染错误:', err));
-	                }
-	            }, 500); // 增加延迟以确保 Vue 完成 DOM 插入
-	        },
-	
-	        runTypeset() {
-	            // 局部动态生成内容后的手动渲染
-	            this.$nextTick(() => {
-	                if (window.MathJax && window.MathJax.typesetPromise) {
-	                    window.MathJax.typesetPromise();
-	                }
-	            });
-	        },
-	
-	        randomExample() {
-	            let data = this.cachedData || chapterDetails[1];
-	            if(data && data.pool_examples) {
-	                const item = data.pool_examples[Math.floor(Math.random() * data.pool_examples.length)];
-	                const el = document.getElementById('math-area-example');
-	                if(el) {
-	                    el.innerHTML = `
-	                        <div class="math-q">${item.q_jp}</div>
-	                        <div class="math-cn">${item.q_cn}</div>
-	                        <div class="math-sol">解： ${item.sol}</div>
-	                    `;
-	                    this.runTypeset(); // 重新渲染新生成的公式
-	                }
-	            }
+		data() {
+			return {
+				isMathJaxReady: false,
+				cachedData: null
+			}
+		},
+		mounted() {
+			this.initMathJax();
+		},
+		methods: {
+			initMathJax() {
+				// 配置 MathJax 参数
+				window.MathJax = {
+					tex: {
+						inlineMath: [['$', '$'], ['\\(', '\\)']],
+						displayMath: [['$$', '$$'], ['\\[', '\\]']],
+						processEscapes: true
+					},
+					options: {
+						enableMenu: false // 禁用移动端右键菜单
+					},
+					startup: {
+						typeset: false
+					}
+				};
+
+				// 加载本地脚本以解决真机公式显示问题
+				const script = document.createElement('script');
+				script.src = "../../static/js/tex-mml-chtml.js";
+				script.async = true;
+				script.onload = () => {
+					this.isMathJaxReady = true;
+					if(this.cachedData) this.refreshAll();
+				};
+				script.onerror = () => {
+					// 备用方案：如果本地脚本加载失败则尝试 CDN
+					const cdnScript = document.createElement('script');
+					cdnScript.src = "https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js";
+					cdnScript.onload = () => {
+						this.isMathJaxReady = true;
+						if(this.cachedData) this.refreshAll();
+					};
+					document.head.appendChild(cdnScript);
+				};
+				document.head.appendChild(script);
 			},
 
-			// 生成随机测试
-			randomTest(event, ownerInstance) {
-				let data = this.cachedData;
-				if (!data) data = chapterDetails[1];
+			renderMath(newValue) {
+				if (newValue) {
+					this.cachedData = newValue;
+					this.refreshAll();
+				}
+			},
 
+			refreshAll() {
+				if (!this.isMathJaxReady) return;
+				this.randomExample();
+				// 延迟确保 Vue DOM 更新后执行公式排版
+				setTimeout(() => {
+					this.runTypeset();
+				}, 500);
+			},
+
+			runTypeset() {
+				if (window.MathJax && window.MathJax.typesetPromise) {
+					window.MathJax.typesetPromise().catch((err) => console.error('MathJax渲染失败:', err));
+				}
+			},
+
+			randomExample() {
+				let data = this.cachedData || chapterDetails[1];
+				if(data && data.pool_examples && data.pool_examples.length > 0) {
+					const list = data.pool_examples;
+					const item = list[Math.floor(Math.random() * list.length)];
+					const el = document.getElementById('math-area-example');
+					if(el) {
+						el.innerHTML = `
+							<div style="font-weight:bold; margin-bottom:8px; font-size:16px;">${item.q_jp}</div>
+							<div style="color:#666; font-size:14px; margin-bottom:12px;">${item.q_cn}</div>
+							<div style="background:#f9f9f9; padding:10px; border-radius:5px; border-left:3px solid #ccc;">
+								<div style="color:#e84393; font-weight:bold; font-size:14px;">考え方：</div>
+								<div style="font-size:14px; margin: 4px 0;">${item.think_jp}</div>
+								<div style="font-size:12px; color:#888;">${item.think_cn}</div>
+							</div>
+							<div style="margin-top:12px; font-weight:bold; font-size:16px; color:#333;">解： <span style="color:#0984e3">${item.sol}</span></div>
+						`;
+						this.runTypeset();
+					}
+				}
+			},
+
+			randomTest() {
+				let data = this.cachedData || chapterDetails[1];
 				if(data && data.pool_tests && data.pool_tests.length > 0) {
 					const list = data.pool_tests;
 					const item = list[Math.floor(Math.random() * list.length)];
 					const el = document.getElementById('math-area-test');
 					const uid = 'ans-' + Math.floor(Math.random() * 10000);
-					
 					if(el) {
 						el.innerHTML = `
 							<div style="margin-bottom:15px; font-weight:bold; font-size:16px;">Q. ${item.q}</div>
@@ -268,14 +260,33 @@
 				}
 			},
 
+			// 修改语音合成方法，适配原生安卓环境
 			speak(text) {
 				if(!text) return;
+				// 去除 LaTeX 代码，只朗读核心文本
 				let clean = text.replace(/\$.*?\$/g, "数式");
+				
+				// #ifdef APP-PLUS
+				// 使用 uni-app 原生语音合成 API 解决真机无声问题
+				plus.speech.stop();
+				plus.speech.startSynthesize(clean, {
+					lang: 'ja-JP',
+					rate: 0.9
+				}, () => {
+					console.log('播放成功');
+				}, (err) => {
+					console.error('播放失败:', err);
+				});
+				// #endif
+
+				// #ifndef APP-PLUS
+				// 非 App 环境使用 Web API
 				window.speechSynthesis.cancel();
 				let u = new SpeechSynthesisUtterance(clean);
 				u.lang = 'ja-JP'; 
 				u.rate = 0.9;
 				window.speechSynthesis.speak(u);
+				// #endif
 			}
 		}
 	}
@@ -285,7 +296,6 @@
 	page { background-color: #f4f8fb; }
 	.content { padding-bottom: 50px; }
 	
-	/* 导航栏样式 */
 	.top-nav-area {
 		position: sticky;
 		top: 0;
@@ -293,48 +303,16 @@
 		background: #fff;
 		box-shadow: 0 2px 10px rgba(0,0,0,0.05);
 	}
-	.nav-scroll {
-		width: 100%;
-		white-space: nowrap;
-		height: 50px;
-	}
-	.nav-container {
-		display: flex;
-		align-items: center;
-		height: 50px;
-		padding: 0 10px;
-	}
+	.nav-scroll { width: 100%; white-space: nowrap; height: 50px; }
+	.nav-container { display: flex; align-items: center; height: 50px; padding: 0 10px; }
 	.nav-item {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		height: 32px;
-		padding: 0 15px;
-		margin-right: 10px;
-		background: #f0f2f5;
-		border-radius: 16px;
-		font-size: 14px;
-		color: #555;
-		font-weight: bold;
+		display: inline-flex; align-items: center; justify-content: center;
+		height: 32px; padding: 0 15px; margin-right: 10px;
+		background: #f0f2f5; border-radius: 16px; font-size: 14px; color: #555; font-weight: bold;
 	}
-	.nav-item.active {
-		background: #2d3436;
-		color: #fff;
-	}
-	.home-btn {
-		background: #00b894;
-		color: white;
-	}
+	.nav-item.active { background: #2d3436; color: #fff; }
+	.home-btn { background: #00b894; color: white; }
 
-	.nav-bar { 
-		padding: 10px 20px; 
-		display: flex; 
-		align-items: center; 
-		font-size: 14px; 
-		color: #666;
-	}
-	.back-btn { padding: 5px; }
-	
 	.container { padding: 30rpx; }
 	.chapter-header { padding: 60rpx 30rpx; border-radius: 20rpx; color: white; margin-bottom: 40rpx; box-shadow: 0 5px 15px rgba(0,0,0,0.1); text-align: center; }
 	.h1 { font-size: 40rpx; font-weight: bold; display: block; margin-bottom: 15rpx; text-shadow: 1px 1px 3px rgba(0,0,0,0.2); }
@@ -347,7 +325,7 @@
 	.item-row:last-child { border-bottom: none; margin-bottom: 0; }
 	
 	.jp-box { display: flex; flex-wrap: wrap; align-items: center; margin-bottom: 10rpx; }
-	.math-text { font-size: 30rpx; color: #333; line-height: 1.6; word-wrap: break-word; }
+	.math-text { font-size: 30rpx; color: #333; margin-right: 10px; display: inline-block; line-height: 1.6; }
 	.note-text { font-size: 26rpx; color: #666; margin-left: 5px; display: inline-block; }
 
 	.btn-group { display: inline-flex; align-items: center; }
@@ -361,9 +339,16 @@
 	.btn-generate { font-size: 24rpx; background: #9b59b6; color: white; padding: 10rpx 25rpx; border-radius: 30rpx; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
 	.btn-generate:active { transform: scale(0.95); opacity: 0.9; }
 
-	.math-block { margin: 20rpx 0; padding: 20rpx; background: #fdfdfd; border-radius: 12rpx; overflow-x: auto; -webkit-overflow-scrolling: touch; }
-    .dynamic-zone:empty { display: none; }
-	.svg-container { width: 100%; display: flex; justify-content: center; margin: 20rpx 0; padding: 20rpx; background-color: #f9f9f9; border-radius: 12rpx; }
-	.svg-container :deep(svg) { width: 60% !important; height: auto !important; max-width: 400rpx; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1)); }
-	@media (min-width: 768px) { .svg-container :deep(svg) { max-width: 500rpx; } }
-	</style>
+	.math-block { margin: 15rpx 0; background: #fafafa; padding: 10px; border-radius: 8px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+	.dynamic-zone { padding: 25rpx; border-radius: 10rpx; background: #fff8f8; border: 1px dashed #fab1a0; min-height: 100rpx; }
+
+	/* 优化图像尺寸，防止在安卓端显示过大 */
+	.svg-container { 
+		width: 100%; display: flex; justify-content: center; margin: 20rpx 0; 
+		padding: 20rpx; background: #f9f9f9; border-radius: 12rpx;
+	}
+	.svg-container :deep(svg) {
+		width: 60% !important; height: auto !important; max-width: 400rpx;
+		filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
+	}
+</style>
